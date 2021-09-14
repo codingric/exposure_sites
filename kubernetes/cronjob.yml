@@ -1,0 +1,15 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: exposure-sites
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: exposure-sites
+              image: ghcr.io/codingric/exposure_sites
+              imagePullPolicy: IfNotPresent
+          restartPolicy: OnFailure

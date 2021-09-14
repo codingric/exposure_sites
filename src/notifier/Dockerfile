@@ -14,3 +14,5 @@ FROM alpine:3.14
 
 COPY --from=build /app/exposure_sites .
 
+ENTRYPOINT [ "/exposure_sites" ]
+
