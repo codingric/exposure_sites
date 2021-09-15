@@ -1,0 +1,30 @@
+name: Build docker image
+
+on: [push]
+
+defaults:
+  run:
+    working-directory: src
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build docker image
+        run: docker-compose build
+
+      - name: Login to GHCR
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: codingric
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Distribute image
+        run: docker-compose push
+
+      - name: Static scans
+        run: docker-compose scan
