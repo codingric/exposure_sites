@@ -27,4 +27,4 @@ jobs:
         run: docker-compose push
 
       - name: Static scans
-        run: docker-compose scan
+        run: docker-compose run scan
