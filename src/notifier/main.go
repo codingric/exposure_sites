@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/md5"
 	"encoding/base64"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/jmespath/go-jmespath"
+	"github.com/urfave/cli"
 )
 
 type State struct {
@@ -25,6 +27,60 @@ type State struct {
 }
 
 func main() {
+	app := cli.NewApp()
+	app.Commands = []cli.Command{
+		{
+			Name:  "config",
+			Usage: "add a task to the list",
+			Action: func(c *cli.Context) error {
+				config()
+				return nil
+			},
+		},
+		{
+			Name:  "check",
+			Usage: "Run a check now",
+			Action: func(c *cli.Context) error {
+				check()
+				return nil
+			},
+		},
+	}
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func config() {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Print("meeiot Token: ")
+	scanner.Scan()
+	os.Setenv("TOKEN", scanner.Text())
+
+	state := State{}
+
+	fmt.Print("Twilio SID: ")
+	scanner.Scan()
+	state.Sid = scanner.Text()
+
+	fmt.Print("Twilio Token: ")
+	scanner.Scan()
+	state.Token = scanner.Text()
+
+	fmt.Print("Mobile: ")
+	scanner.Scan()
+	state.Mobile = scanner.Text()
+
+	fmt.Print("Suburb to check: ")
+	scanner.Scan()
+	state.Suburb = scanner.Text()
+	state.Hash = "0"
+
+	save_state(state)
+}
+
+func check() {
 	data := lastest_data()
 	state := get_state()
 	generated := hash(data, state)
@@ -66,13 +122,10 @@ func get_state() State {
 	}
 	defer resp.Body.Close()
 
-	// Read byte, convert json bytes to string
 	enc, _ := ioutil.ReadAll(resp.Body)
 
-	// b64decode
 	dec, _ := base64.StdEncoding.DecodeString(string(enc))
 
-	// load into state
 	json.Unmarshal(dec, &state)
 	log.Printf("State Loaded: hash=%s suburb=%s", state.Hash, state.Suburb)
 	return state
@@ -88,6 +141,9 @@ func save_state(state State) bool {
 	}
 	defer resp.Body.Close()
 	data, _ := ioutil.ReadAll(resp.Body)
+	if string(data) != "0:0" {
+		log.Fatal(string(data))
+	}
 	var result bool
 	json.Unmarshal(data, &result)
 	return result

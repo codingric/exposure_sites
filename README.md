@@ -2,11 +2,7 @@
 
 Checks Victorian exposure site data, filters for a suburb of interest, notifies if new exposure sites detected
 
-```
-docker run -e TOKEN=__meeiot_token__ ghcr.io/codingric/exposure_sites
-```
-
-## Configuration/Requirements
+## Requirements
 
 ### Twilio
 
@@ -18,11 +14,16 @@ docker run -e TOKEN=__meeiot_token__ ghcr.io/codingric/exposure_sites
 - Generate a new token here: https://www.meeiot.org/?p=start.php
 - Export to environment variable
 ```
-export TOKEN={token}
+export TOKEN=__meeiot_token__
 ```
 - Seed your configuration
 ```
-export STATEDATA=$(echo -n '{"hash":null,"mobile":"+614xxxxxxxx","sid":"__twilio_sid__","token":"__twilio_token__","suburb":"Melbourne"}' | base64)
-curl https://www.meeiot.org/put/$TOKEN/state=$STATEDATA
+docker run -it ghcr.io/codingric/exposure_sites config
+```
+
+### Running a check
+
+```
+docker run -e TOKEN ghcr.io/codingric/exposure_sites
 ```
 
