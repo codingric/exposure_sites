@@ -11,6 +11,7 @@ RUN go mod download \
     && ls -al
 
 FROM alpine:3.14
+LABEL org.opencontainers.image.source https://github.com/codingric/exposure_sites
 
 COPY --from=build /app/exposure_sites .
 

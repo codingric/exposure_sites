@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,22 +16,29 @@ import (
 	"github.com/jmespath/go-jmespath"
 )
 
+type State struct {
+	Hash   string `json:"hash"`
+	Sid    string `json:"sid"`
+	Token  string `json:"token"`
+	Mobile string `json:"mobile"`
+	Suburb string `json:"suburb"`
+}
+
 func main() {
-	suburb := os.Args[1]
 	data := lastest_data()
-	generated := hash(data, suburb)
-	saved := get_value("hash")
-	log.Printf("Saved hash: %s", saved)
-	if generated != saved {
-		log.Printf("New exposure site in %s (%t)\n", suburb, set_value("hash", generated))
-		notify(suburb)
+	state := get_state()
+	generated := hash(data, state)
+	if generated != state.Hash {
+		state.Hash = generated
+		log.Printf("New exposure site in %s (%t)\n", state.Suburb, save_state(state))
+		notify(state)
 	}
 }
 
-func hash(jsondata []byte, suburb string) string {
+func hash(jsondata []byte, state State) string {
 	var data interface{}
 	json.Unmarshal(jsondata, &data)
-	query := fmt.Sprintf("result.records[?Suburb==`\"%s\"`]", suburb)
+	query := fmt.Sprintf("result.records[?Suburb==`\"%s\"`]", state.Suburb)
 	result, _ := jmespath.Search(query, data)
 	j, _ := json.Marshal(result)
 	hash := fmt.Sprintf("%x", md5.Sum(j))
@@ -49,49 +57,56 @@ func lastest_data() []byte {
 	return data
 }
 
-func get_value(key string) string {
-	var value string
-	url := fmt.Sprintf("https://keyvalue.immanuel.co/api/KeyVal/GetValue/%s/%s", os.Getenv("TOKEN"), key)
+func get_state() State {
+	var state State
+	url := fmt.Sprintf("https://www.meeiot.org/get/%s/state", os.Getenv("TOKEN"))
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
-	json.Unmarshal(data, &value)
-	return value
+
+	// Read byte, convert json bytes to string
+	enc, _ := ioutil.ReadAll(resp.Body)
+
+	// b64decode
+	dec, _ := base64.StdEncoding.DecodeString(string(enc))
+
+	// load into state
+	json.Unmarshal(dec, &state)
+	log.Printf("State Loaded: hash=%s suburb=%s", state.Hash, state.Suburb)
+	return state
 }
 
-func set_value(key string, value string) bool {
-	var result bool
-	url := fmt.Sprintf("https://keyvalue.immanuel.co/api/KeyVal/UpdateValue/%s/%s/%s", os.Getenv("TOKEN"), key, value)
+func save_state(state State) bool {
+	b, _ := json.Marshal(state)
+	value := base64.URLEncoding.EncodeToString(b)
+	url := "https://www.meeiot.org/put/" + os.Getenv("TOKEN") + "/state=" + value
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer([]byte{0}))
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
 	data, _ := ioutil.ReadAll(resp.Body)
-	//log.Printf("SET key %s=%s", key, value)
+	var result bool
 	json.Unmarshal(data, &result)
 	return result
 }
 
-func notify(suburb string) string {
-	account_sid := get_value("sid")
-	auth_token := get_value("token")
+func notify(state State) string {
 
-	endpoint := "https://api.twilio.com/2010-04-01/Accounts/" + account_sid + "/Messages"
+	endpoint := "https://api.twilio.com/2010-04-01/Accounts/" + state.Sid + "/Messages"
 
 	params := url.Values{}
 	params.Set("From", "exposure")
-	params.Set("To", "+61432071731")
-	params.Set("Body", "New exposure sites for "+suburb)
+	params.Set("To", state.Mobile)
+	params.Set("Body", "New exposure sites for "+state.Suburb)
 
 	body := *strings.NewReader(params.Encode())
 
 	client := &http.Client{}
 	req, _ := http.NewRequest("POST", endpoint, &body)
-	req.SetBasicAuth(account_sid, auth_token)
+	req.SetBasicAuth(state.Sid, state.Token)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 

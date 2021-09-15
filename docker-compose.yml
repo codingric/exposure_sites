@@ -1,0 +1,12 @@
+version: '3.7'
+services:
+  exposure_sites:
+    image: ghcr.io/codingric/exposure_sites
+    build: src/notifier
+    environment:
+      - TOKEN
+
+  scan:
+    image: ghcr.io/aquasecurity/trivy:latest
+    command: |
+      -q image --exit-code 1 -s HIGH ghcr.io/codingric/exposure_sites:latest

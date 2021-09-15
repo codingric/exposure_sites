@@ -11,5 +11,11 @@ spec:
           containers:
             - name: exposure-sites
               image: ghcr.io/codingric/exposure_sites
-              imagePullPolicy: IfNotPresent
+              imagePullPolicy: Always
+              env:
+                - name: TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: exposure-sites
+                      key: token
           restartPolicy: OnFailure
