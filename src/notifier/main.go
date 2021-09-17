@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
@@ -14,7 +13,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jmespath/go-jmespath"
 	"github.com/urfave/cli"
 )
 
@@ -52,58 +50,59 @@ func main() {
 	}
 }
 
-func config() {
+func prompt(title string, value string) string {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print("meeiot Token: ")
+	p := title
+	if value != "" {
+		p = fmt.Sprintf("%s (%s)", title, value)
+	}
+	fmt.Printf("%s:", p)
 	scanner.Scan()
-	os.Setenv("TOKEN", scanner.Text())
+	t := scanner.Text()
+	if t == "" {
+		return value
+	}
+	return t
+}
 
+func config() {
 	state := State{}
 
-	fmt.Print("Twilio SID: ")
-	scanner.Scan()
-	state.Sid = scanner.Text()
+	if os.Getenv("TOKEN") != "" {
+		state = get_state()
+	} else {
+		os.Setenv("TOKEN", prompt("Meeiot TOKEN", ""))
+	}
 
-	fmt.Print("Twilio Token: ")
-	scanner.Scan()
-	state.Token = scanner.Text()
-
-	fmt.Print("Mobile: ")
-	scanner.Scan()
-	state.Mobile = scanner.Text()
-
-	fmt.Print("Suburb to check: ")
-	scanner.Scan()
-	state.Suburb = scanner.Text()
+	state.Sid = prompt("Twilio SID", state.Sid)
+	state.Token = prompt("Twilio Token", state.Token)
+	state.Mobile = prompt("Mobile", state.Mobile)
+	state.Suburb = prompt("Suburb", state.Suburb)
 	state.Hash = "0"
 
 	save_state(state)
 }
 
 func check() {
-	data := lastest_data()
 	state := get_state()
+	data := lastest_data(state)
 	generated := hash(data, state)
 	if generated != state.Hash {
 		state.Hash = generated
-		log.Printf("New exposure site in %s (%t)\n", state.Suburb, save_state(state))
+		log.Printf("New exposure site in %s\n", state.Suburb)
+		save_state(state)
 		notify(state)
 	}
 }
 
 func hash(jsondata []byte, state State) string {
-	var data interface{}
-	json.Unmarshal(jsondata, &data)
-	query := fmt.Sprintf("result.records[?Suburb==`\"%s\"`]", state.Suburb)
-	result, _ := jmespath.Search(query, data)
-	j, _ := json.Marshal(result)
-	hash := fmt.Sprintf("%x", md5.Sum(j))
+	hash := fmt.Sprintf("%x", md5.Sum(jsondata))
 	log.Printf("Generated hash: %s\n", hash)
 	return hash
 }
 
-func lastest_data() []byte {
-	resp, err := http.Get("https://discover.data.vic.gov.au/api/3/action/datastore_search?resource_id=afb52611-6061-4a2b-9110-74c920bede77")
+func lastest_data(state State) []byte {
+	resp, err := http.Get("https://discover.data.vic.gov.au/api/3/action/datastore_search?resource_id=afb52611-6061-4a2b-9110-74c920bede77?q=" + state.Suburb)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -124,29 +123,22 @@ func get_state() State {
 
 	enc, _ := ioutil.ReadAll(resp.Body)
 
-	dec, _ := base64.StdEncoding.DecodeString(string(enc))
-
+	dec, _ := base64.URLEncoding.DecodeString(strings.Replace(string(enc), ".", "=", -1))
 	json.Unmarshal(dec, &state)
-	log.Printf("State Loaded: hash=%s suburb=%s", state.Hash, state.Suburb)
+	log.Printf("State Loaded: hash=%s suburb=%s\n", state.Hash, state.Suburb)
 	return state
 }
 
-func save_state(state State) bool {
+func save_state(state State) {
 	b, _ := json.Marshal(state)
 	value := base64.URLEncoding.EncodeToString(b)
-	url := "https://www.meeiot.org/put/" + os.Getenv("TOKEN") + "/state=" + value
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer([]byte{0}))
+	url := "https://www.meeiot.org/put/" + os.Getenv("TOKEN") + "/state=" + strings.Replace(value, "=", ".", -1)
+	resp, err := http.Post(url, "application/json", nil)
 	if err != nil {
+		log.Println("Failed to post")
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
-	data, _ := ioutil.ReadAll(resp.Body)
-	if string(data) != "0:0" {
-		log.Fatal(string(data))
-	}
-	var result bool
-	json.Unmarshal(data, &result)
-	return result
 }
 
 func notify(state State) string {
