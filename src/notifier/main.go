@@ -2,7 +2,8 @@ package main
 
 import (
 	"bufio"
-	"crypto/md5"
+	"bytes"
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -13,23 +14,25 @@ import (
 	"os"
 	"strings"
 
+	"github.com/itchyny/gojq"
 	"github.com/urfave/cli"
 )
 
 type State struct {
-	Hash   string `json:"hash"`
-	Sid    string `json:"sid"`
-	Token  string `json:"token"`
-	Mobile string `json:"mobile"`
-	Suburb string `json:"suburb"`
+	Sid      string   `json:"sid"`
+	Token    string   `json:"token"`
+	Mobile   string   `json:"mobile"`
+	Suburb   string   `json:"suburb"`
+	Previous []string `json:"previous"`
 }
 
 func main() {
 	app := cli.NewApp()
+	app.Usage = "COVID19 Victorian Exposure Sites"
 	app.Commands = []cli.Command{
 		{
 			Name:  "config",
-			Usage: "add a task to the list",
+			Usage: "Seed state",
 			Action: func(c *cli.Context) error {
 				config()
 				return nil
@@ -78,27 +81,76 @@ func config() {
 	state.Token = prompt("Twilio Token", state.Token)
 	state.Mobile = prompt("Mobile", state.Mobile)
 	state.Suburb = prompt("Suburb", state.Suburb)
-	state.Hash = "0"
+	state.Previous = []string{}
 
 	save_state(state)
 }
 
 func check() {
 	state := get_state()
-	data := lastest_data(state)
-	generated := hash(data, state)
-	if generated != state.Hash {
-		state.Hash = generated
-		log.Printf("New exposure site in %s\n", state.Suburb)
+	raw := lastest_data(state)
+	data := filter(raw)
+	added, removed := validate(data, state)
+	if len(added) > 0 || len(removed) > 0 {
+		message := ""
+		if len(added) > 0 {
+			message = "New exposure sites:"
+			for _, n := range added {
+				message = fmt.Sprintf("%s\n%s (%s)\n", message, n, "https://www.google.com/maps/place/"+url.QueryEscape(n))
+			}
+		}
+
+		state.Previous = data
 		save_state(state)
-		notify(state)
+		notify(message, state)
 	}
 }
 
-func hash(jsondata []byte, state State) string {
-	hash := fmt.Sprintf("%x", md5.Sum(jsondata))
-	log.Printf("Generated hash: %s\n", hash)
-	return hash
+func filter(jsondata []byte) []string {
+	var data interface{}
+	processed := []string{}
+	json.Unmarshal(jsondata, &data)
+	query, _ := gojq.Parse(`[.result.records[]|[.Site_streetaddress,.Suburb,.Site_state,.Site_postcode]|join(" ")]|unique`)
+	iter := query.Run(data)
+	filtered, _ := iter.Next()
+	for _, v := range filtered.([]interface{}) {
+		processed = append(processed, fmt.Sprintf("%v", v))
+	}
+	log.Printf("Current exposure sites: %d", len(processed))
+	return processed
+}
+
+func validate(current []string, state State) ([]string, []string) {
+	added := []string{}
+	removed := []string{}
+
+	for _, c := range current {
+		found := false
+		for _, p := range state.Previous {
+			if c == p {
+				found = true
+				break
+			}
+		}
+		if !found {
+			added = append(added, c)
+		}
+	}
+
+	for _, p := range state.Previous {
+		found := false
+		for _, c := range current {
+			if c == p {
+				found = true
+				break
+			}
+		}
+		if !found {
+			removed = append(removed, p)
+		}
+	}
+
+	return added, removed
 }
 
 func lastest_data(state State) []byte {
@@ -121,17 +173,24 @@ func get_state() State {
 	}
 	defer resp.Body.Close()
 
-	enc, _ := ioutil.ReadAll(resp.Body)
-
-	dec, _ := base64.URLEncoding.DecodeString(strings.Replace(string(enc), ".", "=", -1))
-	json.Unmarshal(dec, &state)
-	log.Printf("State Loaded: hash=%s suburb=%s\n", state.Hash, state.Suburb)
+	rawb64, _ := ioutil.ReadAll(resp.Body)
+	raw, _ := base64.URLEncoding.DecodeString(strings.Replace(string(rawb64), ".", "=", -1))
+	br := bytes.NewReader(raw)
+	gz, _ := gzip.NewReader(br)
+	data, _ := ioutil.ReadAll(gz)
+	json.Unmarshal(data, &state)
+	log.Printf("State Loaded: previous exposure sites:%d\n", len(state.Previous))
 	return state
 }
 
 func save_state(state State) {
-	b, _ := json.Marshal(state)
-	value := base64.URLEncoding.EncodeToString(b)
+	j, _ := json.Marshal(state)
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	gz.Write(j)
+	gz.Flush()
+	gz.Close()
+	value := base64.URLEncoding.EncodeToString(b.Bytes())
 	url := "https://www.meeiot.org/put/" + os.Getenv("TOKEN") + "/state=" + strings.Replace(value, "=", ".", -1)
 	resp, err := http.Post(url, "application/json", nil)
 	if err != nil {
@@ -139,16 +198,17 @@ func save_state(state State) {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
+	log.Println("State saved.")
 }
 
-func notify(state State) string {
+func notify(message string, state State) string {
 
 	endpoint := "https://api.twilio.com/2010-04-01/Accounts/" + state.Sid + "/Messages"
 
 	params := url.Values{}
 	params.Set("From", "exposure")
 	params.Set("To", state.Mobile)
-	params.Set("Body", "New exposure sites for "+state.Suburb)
+	params.Set("Body", message)
 
 	body := *strings.NewReader(params.Encode())
 
