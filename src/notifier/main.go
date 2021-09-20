@@ -97,6 +97,15 @@ func check() {
 			message = "New exposure sites:"
 			for _, n := range added {
 				message = fmt.Sprintf("%s\n%s (%s)\n", message, n, "https://www.google.com/maps/place/"+url.QueryEscape(n))
+				log.Printf("NEW: %s", n)
+			}
+		}
+
+		if len(removed) > 0 {
+			message = message + "\nRemoved exposure sites:"
+			for _, n := range added {
+				message = fmt.Sprintf("%s\n%s\n", message, n)
+				log.Printf("REMOVED: %s", n)
 			}
 		}
 
