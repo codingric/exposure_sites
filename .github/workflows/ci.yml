@@ -13,6 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Dockerfile scans
+        run: docker-compose run checkov
+
       - name: Run unit tests
         run: docker-compose run tests
 
@@ -29,4 +32,4 @@ jobs:
           && docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t ghcr.io/codingric/exposure_sites --push notifier
 
       - name: Static scans
-        run: docker-compose run scan
+        run: docker-compose run trivy

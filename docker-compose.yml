@@ -1,15 +1,21 @@
 version: '3.7'
-services:    
+services:
   exposure_sites:
     image: ghcr.io/codingric/exposure_sites
     build: src/notifier
     environment:
       - TOKEN
 
-  scan:
+  trivy:
     image: ghcr.io/aquasecurity/trivy:latest
     command: |
       -q image --exit-code 1 -s HIGH ghcr.io/codingric/exposure_sites:latest
+
+  checkov:
+    image: bridgecrew/checkov:latest
+    command: '-d /src'
+    volumes:
+      - ./src/notifier:/src
 
   tests:
     image: golang:alpine
