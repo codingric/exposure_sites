@@ -10,3 +10,11 @@ services:
     image: ghcr.io/aquasecurity/trivy:latest
     command: |
       -q image --exit-code 1 -s HIGH ghcr.io/codingric/exposure_sites:latest
+
+  tests:
+    image: golang:alpine
+    working_dir: /app
+    volumes:
+      - ./src/notifier:/app
+    entrypoint: |
+      sh -c 'apk add gcc libc-dev && go mod download && go test -v -cover'

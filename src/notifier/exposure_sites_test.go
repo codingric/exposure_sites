@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"reflect"
@@ -15,7 +16,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	//log.SetOutput(ioutil.Discard)
+	log.SetOutput(ioutil.Discard)
 	//fmt.SetOutput(ioutil.Discard)
 	os.Exit(m.Run())
 }
