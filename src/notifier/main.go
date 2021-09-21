@@ -85,8 +85,6 @@ func check() (state State) {
 		log.Fatalf("Unable to load state: %s", err.Error())
 	}
 
-	fmt.Printf("STATE: %v", state)
-
 	raw, err := latest_data(state)
 	if err != nil {
 		log.Fatalf("Unable to retreive new data: %s", err.Error())

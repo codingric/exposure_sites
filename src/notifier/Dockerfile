@@ -2,12 +2,14 @@ FROM golang:alpine AS build
 
 WORKDIR /app
 
+RUN apk add gcc libc-dev
+
 COPY *.go ./
 COPY go.sum .
 COPY go.mod .
 
 RUN go mod download \
-    && GOARCH=arm GOARM=7 GOOS=linux go build
+    && go build
 
 FROM alpine:3.14
 LABEL org.opencontainers.image.source https://github.com/codingric/exposure_sites
