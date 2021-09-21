@@ -1,5 +1,5 @@
 version: '3.7'
-services:
+services:    
   exposure_sites:
     image: ghcr.io/codingric/exposure_sites
     build: src/notifier
