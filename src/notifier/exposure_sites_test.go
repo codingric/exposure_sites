@@ -204,7 +204,7 @@ func TestCheck(t *testing.T) {
 	})
 
 	monkey.Patch(notify, func(m string, s State) (string, error) {
-		expected := "New exposure sites:\n1 Mock Street Mockville VIC 0000 (https://www.google.com/maps/place/1+Mock+Street+Mockville+VIC+0000)\n\nRemoved exposure sites:\n2 Removed Road Mockville VIC 0000\n"
+		expected := "New exposure sites:\n1 Mock Street Mockville VIC 0000 (https://www.google.com/maps/place/1+Mock+Street+Mockville+VIC+0000)\n\nRemoved exposure sites:\n2 Removed Road Mockville VIC 0000"
 
 		if m != expected {
 			t.Errorf("Expected '%s' not '%s'", expected, m)

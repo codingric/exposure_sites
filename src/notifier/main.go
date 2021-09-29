@@ -103,7 +103,7 @@ func check() (state State) {
 		}
 
 		if len(removed) > 0 {
-			message = message + "\nRemoved exposure sites:"
+			message = message + "\n\nRemoved exposure sites:"
 			for _, n := range removed {
 				message = fmt.Sprintf("%s\n%s", message, n)
 				log.Printf("REMOVED: %s", n)
