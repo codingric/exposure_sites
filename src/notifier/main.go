@@ -97,7 +97,7 @@ func check() (state State) {
 		if len(added) > 0 {
 			message = "New exposure sites:"
 			for _, n := range added {
-				message = fmt.Sprintf("%s\n%s (%s)\n", message, n, "https://www.google.com/maps/place/"+url.QueryEscape(n))
+				message = fmt.Sprintf("%s\n%s (%s)", message, n, "https://www.google.com/maps/place/"+url.QueryEscape(n))
 				log.Printf("NEW: %s", n)
 			}
 		}
@@ -105,7 +105,7 @@ func check() (state State) {
 		if len(removed) > 0 {
 			message = message + "\nRemoved exposure sites:"
 			for _, n := range removed {
-				message = fmt.Sprintf("%s\n%s\n", message, n)
+				message = fmt.Sprintf("%s\n%s", message, n)
 				log.Printf("REMOVED: %s", n)
 			}
 		}
