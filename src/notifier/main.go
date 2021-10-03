@@ -91,23 +91,35 @@ func check() (state State) {
 	}
 
 	data := filter(raw)
-	added, removed := validate(data, state)
+	added, removed, common := validate(data, state)
+
 	if len(added) > 0 || len(removed) > 0 {
-		message := "Current sites:"
-		for _, n := range state.Previous {
-			message = fmt.Sprintf("%s\n%s", message, n)
+		message := ""
+		if len(common) > 0 {
+			message = message + "Current sites:"
+			for _, n := range common {
+				message = fmt.Sprintf("%s\n%s", message, n)
+			}
+		}
+
+		if message != "" {
+			message = message + "\n\n"
 		}
 
 		if len(added) > 0 {
-			message = "\n\nNew sites:"
+			message = message + "New sites:"
 			for _, n := range added {
 				message = fmt.Sprintf("%s\n%s (%s)", message, n, "https://www.google.com/maps/place/"+url.QueryEscape(n))
 				log.Printf("NEW: %s", n)
 			}
 		}
 
+		if message != "" {
+			message = message + "\n\n"
+		}
+
 		if len(removed) > 0 {
-			message = message + "\n\nRemoved sites:"
+			message = message + "Removed sites:"
 			for _, n := range removed {
 				message = fmt.Sprintf("%s\n%s", message, n)
 				log.Printf("REMOVED: %s", n)
@@ -135,15 +147,17 @@ func filter(jsondata []byte) []string {
 	return processed
 }
 
-func validate(current []string, state State) ([]string, []string) {
+func validate(current []string, state State) ([]string, []string, []string) {
 	added := []string{}
 	removed := []string{}
+	same := []string{}
 
 	for _, c := range current {
 		found := false
 		for _, p := range state.Previous {
 			if c == p {
 				found = true
+				same = append(same, c)
 				break
 			}
 		}
@@ -165,5 +179,5 @@ func validate(current []string, state State) ([]string, []string) {
 		}
 	}
 
-	return added, removed
+	return added, removed, same
 }

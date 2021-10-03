@@ -25,20 +25,30 @@ func TestValidate(t *testing.T) {
 	prev := State{Previous: []string{}}
 	current := []string{"New"}
 
-	add, removed := validate(current, prev)
+	add, removed, same := validate(current, prev)
 
-	if len(add) != 1 || len(removed) != 0 {
+	if len(add) != 1 || len(removed) != 0 || len(same) != 0 {
 		t.Errorf("New address not detected")
 	}
 
 	current = []string{}
 	prev = State{Previous: []string{"Removed"}}
 
-	add, removed = validate(current, prev)
+	add, removed, same = validate(current, prev)
 
-	if len(add) != 0 || len(removed) != 1 {
+	if len(add) != 0 || len(removed) != 1 || len(same) != 0 {
 		t.Errorf("Removed address not detected")
 	}
+
+	current = []string{"Keep"}
+	prev = State{Previous: []string{"Keep"}}
+
+	add, removed, same = validate(current, prev)
+
+	if len(add) != 0 || len(removed) != 0 || len(same) != 1 {
+		t.Errorf("Common address not detected")
+	}
+
 }
 
 func TestGetState(t *testing.T) {
@@ -204,7 +214,7 @@ func TestCheck(t *testing.T) {
 	})
 
 	monkey.Patch(notify, func(m string, s State) (string, error) {
-		expected := "New exposure sites:\n1 Mock Street Mockville VIC 0000 (https://www.google.com/maps/place/1+Mock+Street+Mockville+VIC+0000)\n\nRemoved exposure sites:\n2 Removed Road Mockville VIC 0000"
+		expected := "Current sites:\n3 Existing Avenue Mockville VIC 0000\n\nNew sites:\n1 Mock Street Mockville VIC 0000 (https://www.google.com/maps/place/1+Mock+Street+Mockville+VIC+0000)\n\nRemoved sites:\n2 Removed Road Mockville VIC 0000"
 
 		if m != expected {
 			t.Errorf("Expected '%s' not '%s'", expected, m)
