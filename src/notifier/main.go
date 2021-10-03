@@ -93,9 +93,13 @@ func check() (state State) {
 	data := filter(raw)
 	added, removed := validate(data, state)
 	if len(added) > 0 || len(removed) > 0 {
-		message := ""
+		message := "Current sites:"
+		for _, n := range state.Previous {
+			message = fmt.Sprintf("%s\n%s", message, n)
+		}
+
 		if len(added) > 0 {
-			message = "New exposure sites:"
+			message = "\n\nNew sites:"
 			for _, n := range added {
 				message = fmt.Sprintf("%s\n%s (%s)", message, n, "https://www.google.com/maps/place/"+url.QueryEscape(n))
 				log.Printf("NEW: %s", n)
@@ -103,7 +107,7 @@ func check() (state State) {
 		}
 
 		if len(removed) > 0 {
-			message = message + "\n\nRemoved exposure sites:"
+			message = message + "\n\nRemoved sites:"
 			for _, n := range removed {
 				message = fmt.Sprintf("%s\n%s", message, n)
 				log.Printf("REMOVED: %s", n)
